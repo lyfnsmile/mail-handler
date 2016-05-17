@@ -141,7 +141,7 @@ function parseUnread() {
                 //开始解析邮件内容
                 var parser = new MailParser();
 
-                console.log(seqno)
+                console.log(seqno);
 
                 parser.on("end", function(mail) {
                     console.log(mail.text)
@@ -196,13 +196,34 @@ function parseUnread() {
 
                     //如果存在附件就保存到本地
                     if (mail.attachments) {
-                        mail.attachments.forEach(function(attachment) {
-                            fs.writeFile('msg-' + seqno + '-' + attachment.generatedFileName, attachment.content, function(err) {
-                                if (err) {
-                                    throw err;
-                                }
-                            });
-                        });
+
+                        //检查目录是否存在
+                        //存在就不创建
+                        //不存在就异步创建一个文件夹
+                        fs.exists("attachments", function(exists) {
+                            console.log(exists)
+                            if (exists) {
+                                mail.attachments.forEach(function(attachment) {
+                                    fs.writeFile(__dirname + '/attachments/' + 'msg-' + seqno + '-' + attachment.generatedFileName, attachment.content, function(err) {
+                                        if (err) {
+                                            throw err;
+                                        }
+                                    });
+                                });
+                            } else {
+                                fs.mkdir("attachments", function() {
+                                    mail.attachments.forEach(function(attachment) {
+                                        fs.writeFile(__dirname + '/attachments/' + 'msg-' + seqno + '-' + attachment.generatedFileName, attachment.content, function(err) {
+                                            if (err) {
+                                                throw err;
+                                            }
+                                        });
+                                    });
+                                })
+                            }
+                        })
+
+
                     };
                 });
 
