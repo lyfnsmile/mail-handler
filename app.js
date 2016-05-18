@@ -28,6 +28,15 @@ function MailHandler(options) {
         throw new error('参数类型错误!')
     }
 
+    this.filterRuler = options.filterRuler || null;
+
+    // filterRuler={
+    //     "address":['2840254348@qq.com'],
+    //     "keywords":['李志祥']
+    // }
+
+    this.keepAttachments = options.keepAttachments;
+
     this.fetchUnreadOnStart = !!options.fetchUnreadOnStart;
     //mailParserOptiond={}
     //邮件解析配置参数
@@ -64,11 +73,6 @@ function MailHandler(options) {
             pass: options.send.pass
         }
     }
-
-    if (options.send.filterContent) {
-        this.filterContent = options.send.filterContent;
-    }
-
 };
 
 //继承EventEmitter类
@@ -87,11 +91,6 @@ MailHandler.prototype = {
         this.imap.end();
     }
 };
-
-function openInbox(callback) {
-    this.imap.openBox(this.mailbox, false, callback);
-}
-
 
 function imapReady() {
     console.log("lizx")
@@ -122,14 +121,15 @@ function imapMail() {
 
 //解析未读邮件
 function parseUnread() {
-    console.log(123)
     var self = this;
     this.imap.search(self.searchFilter, function(err, results) {
+        //c存放拦截邮件的地址
+        var mailIntercept = [];
+
         //results 收取结果数组
-        //
         console.log(results)
         if (err) {
-            self.emit('error', err);
+            throw err
         }
         //异步并发的收取邮件内容
         async.each(results, function(result, callback) {
@@ -141,68 +141,97 @@ function parseUnread() {
                 //开始解析邮件内容
                 var parser = new MailParser();
 
-                console.log(seqno);
-
                 parser.on("end", function(mail) {
-                    console.log(mail.text)
 
+
+
+                    //保存邮件正文
+                    fs.exists("content", function(exists) {
+                        if (exists) {
+                            fs.writeFile(__dirname + '/content/' + 'msg- ' + seqno + '.html', mail.html, function(err) {
+                                if (err) {
+                                    throw err;
+                                }
+                            });
+                        } else {
+                            fs.mkdir("content", function() {
+                                fs.writeFile(__dirname + '/content/' + 'msg- ' + seqno + '.html', mail.html, function(err) {
+                                    if (err) {
+                                        throw err;
+                                    }
+                                });
+                            })
+                        }
+                    })
+
+                    //保存附件
                     if (mail.from) { //首先判断发件人地址
-                        console.log(mail.from[0].address);
-                        //发邮件代码  过滤规则、
-                        if (self.filterContent) { //判断是否有设置过滤规则  按照内容
+                        //发邮件代码  过滤规则
+                        if (self.filterRuler) { //判断是否有设置过滤规则  按照内容
                             //过滤规则 内容 字符串或者数组形式
+                            //
 
                             var smtpTransport = nodemailer.createTransport(this.sendOptions);
 
+                            console.log(122234)
 
-                            var mailOptions = {　　
-                                from: "46967489@qq.com",
-                                　　to: mail.from[0].address,
-                                　　subject: "node邮件",
-                                　　html: '<h2>这是一封自动回复的邮件!</h2><p style="color:#e00;">来自李志祥的邮件</p>'
+                            //过滤收件人
+                            if (self.filterRuler.address && self.filterRuler.address.length != 0) {
+                                var index = self.filterRuler.address.indexOf(mail.from[0].address);
+                                if (index != -1) {
+                                    // var mailAddress = mail.from[0].address;
+                                    // var mailOptions = {　　
+                                    //     from: self.sendOptions.auth.user,
+                                    //     　　to: mail.from[0].address,
+                                    //     　　subject: self.send.sendOptions.title,
+                                    //     　　html: self.send.sendOptions.content
+                                    // };
+
+                                    // smtpTransport.sendMail(mailOptions, function(err, resp) {　　
+                                    //     if (err) {　　　　
+                                    //         throw err;　
+                                    //     }
+                                    //     console.log("发送成功");　　
+                                    //     smtpTransport.close(); //关闭连接池
+                                    // });
+
+                                    if (mailIntercept.indexOf(mail.from[0].address)) {
+                                        mailIntercept.push(mail.from[0].address)
+                                    }
+                                }
                             }
 
-                            if (typeof(self.filterContent) === 'string') {
-                                //默认邮件内容是html形式
-                                if (mail.text && mail.text.indexOf(self.filterContent) != -1) {
 
-                                    smtpTransport.sendMail(mailOptions, function(err, resp) {　　
-                                        if (err) {　　　　
-                                            console.log(err);　
+                            //依据关键字过滤邮件内容
+                            //只要含有关键字之一就拦截
+                            if (self.filterRuler.keywords && self.filterRuler.keywords.length != 0) {
+                                //含有关键字之一只发一封邮件
+                                for (var i = 0; i < self.filterRuler.keywords.length; i++) {
+                                    //根据邮件text而非html来筛选关键字
+                                    if (mail.text.indexOf(self.filterRuler.keywords[i]) != -1) {
+
+                                        if (mailIntercept.indexOf(mail.from[0].address)) {
+                                            mailIntercept.push(mail.from[0].address)
                                         }
-                                        console.log("发送成功")　　
-                                        smtpTransport.close(); //关闭连接池
-                                    });
-                                }
-                            } else { //数组形式
-                                for (var i = 0; i < self.filterContent.length; i++) {
-
-                                    if (mail.html.indexOf(self.filterContent[i]) != -1) {
-
-                                        smtpTransport.sendMail(mailOptions, function(err, resp) {　　
-                                            if (err) {　　　　
-                                                console.log(err);　
-                                            }
-                                            console.log("发送成功")　　
-                                            smtpTransport.close(); //关闭连接池
-                                        });
                                     }
                                 }
 
                             }
 
                         }
-                    };
+                    } else {
+                        console.log("获取不到发件人地址，无法给该封邮件自动回复!")
+                    }
 
                     //如果存在附件就保存到本地
-                    if (mail.attachments) {
+                    if (self.keepAttachments && mail.attachments) {
 
                         //检查目录是否存在
                         //存在就不创建
                         //不存在就异步创建一个文件夹
                         fs.exists("attachments", function(exists) {
-                            console.log(exists)
                             if (exists) {
+                                //mail.attachments为一个数组对象，一封邮件存在多个附件
                                 mail.attachments.forEach(function(attachment) {
                                     fs.writeFile(__dirname + '/attachments/' + 'msg-' + seqno + '-' + attachment.generatedFileName, attachment.content, function(err) {
                                         if (err) {
@@ -227,12 +256,11 @@ function parseUnread() {
                     };
                 });
 
+
                 msg.on('body', function(stream, info) {
                     //已经走到现在这一步了
                     //console.log(info)
                     stream.pipe(parser);
-
-
 
                 })
 
@@ -241,6 +269,11 @@ function parseUnread() {
             f.once('error', function(err) {
                 self.emit('error', err);
             });
+
+            f.once('end', function(err) {
+                console.log(mailIntercept)
+            });
+
         }, function(err) {
             if (err) {
                 self.emit('error', err);
@@ -252,3 +285,9 @@ function parseUnread() {
 
 
 module.exports = MailHandler;
+
+
+
+//关于邮件过滤的思路
+//先把过滤邮件的地址存在一个数组里面
+//等到所有的邮件都收取完成后再群发邮件
