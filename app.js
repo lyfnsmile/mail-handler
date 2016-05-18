@@ -13,8 +13,6 @@ var util = require('util');
 //一是过滤特定发件人的邮件
 //二是过滤特定邮件内容
 
-
-//构造函数
 function MailHandler(options) {
     //options 对象  配置参数  
 
@@ -30,15 +28,8 @@ function MailHandler(options) {
 
     this.filterRuler = options.filterRuler || null;
 
-    // filterRuler={
-    //     "address":['2840254348@qq.com'],
-    //     "keywords":['李志祥']
-    // }
-
     this.keepAttachments = options.keepAttachments;
 
-    this.fetchUnreadOnStart = !!options.fetchUnreadOnStart;
-    //mailParserOptiond={}
     //邮件解析配置参数
     this.mailParserOptions = options.mailParserOptions || {};
     if (options.attachments && options.attachmentOptions && options.attachmentOptions.stream) {
@@ -46,7 +37,7 @@ function MailHandler(options) {
     }
     this.attachmentOptions = options.attachmentOptions || {};
     this.attachments = options.attachments || false;
-    this.attachmentOptions.directory = (this.attachmentOptions.directory ? this.attachmentOptions.directory : '');
+    this.attachmentOptions.directory = (this.attachmentOptions.directory ? this.attachmentOptions.directory : __dirname + '/attachments');
 
     //配置收件箱参数
     this.imap = new Imap({
@@ -60,8 +51,7 @@ function MailHandler(options) {
     });
 
     this.imap.once('ready', imapReady.bind(this));
-    // this.imap.once('close', imapClose.bind(this));
-    // this.imap.on('error', imapError.bind(this));
+
 
     //配置发邮件的相关参数
     this.sendOptions = {
@@ -69,8 +59,8 @@ function MailHandler(options) {
         port: options.send.port,
         secure: true, // use SSL
         auth: {
-            user: options.send.user,
-            pass: options.send.pass
+            user: options.send.auth.user,
+            pass: options.send.auth.pass
         }
     }
 };
@@ -82,20 +72,18 @@ MailHandler.prototype = {
     receive: function() {
         //开始收取邮件       
         this.imap.connect();
-        console.log('开始收取邮件...');
+        console.log('开始读取邮件...');
     },
 
-    end: function() {
+    stop: function() {
         //终止
-
         this.imap.end();
+        console.log('结束读取邮件...');
     }
 };
 
 function imapReady() {
-    console.log("lizx")
     var self = this;
-
 
     this.imap.openBox(this.mailbox, false, function(err, box) {
         if (err) {
@@ -107,14 +95,6 @@ function imapReady() {
 
 }
 
-// function imapClose() {
-//     this.emit('server:disconnected');
-// }
-
-// function imapError(err) {
-//     this.emit('error', err);
-// }
-
 function imapMail() {
     parseUnread.call(this);
 }
@@ -123,11 +103,12 @@ function imapMail() {
 function parseUnread() {
     var self = this;
     this.imap.search(self.searchFilter, function(err, results) {
-        //c存放拦截邮件的地址
+        //存放拦截邮件的地址
         var mailIntercept = [];
 
-        //results 收取结果数组
-        console.log(results)
+        var len = results.length;
+        var flag = 0;
+
         if (err) {
             throw err
         }
@@ -142,8 +123,6 @@ function parseUnread() {
                 var parser = new MailParser();
 
                 parser.on("end", function(mail) {
-
-
 
                     //保存邮件正文
                     fs.exists("content", function(exists) {
@@ -169,48 +148,29 @@ function parseUnread() {
                         //发邮件代码  过滤规则
                         if (self.filterRuler) { //判断是否有设置过滤规则  按照内容
                             //过滤规则 内容 字符串或者数组形式
-                            //
-
-                            var smtpTransport = nodemailer.createTransport(this.sendOptions);
-
-                            console.log(122234)
 
                             //过滤收件人
                             if (self.filterRuler.address && self.filterRuler.address.length != 0) {
                                 var index = self.filterRuler.address.indexOf(mail.from[0].address);
                                 if (index != -1) {
-                                    // var mailAddress = mail.from[0].address;
-                                    // var mailOptions = {　　
-                                    //     from: self.sendOptions.auth.user,
-                                    //     　　to: mail.from[0].address,
-                                    //     　　subject: self.send.sendOptions.title,
-                                    //     　　html: self.send.sendOptions.content
-                                    // };
 
-                                    // smtpTransport.sendMail(mailOptions, function(err, resp) {　　
-                                    //     if (err) {　　　　
-                                    //         throw err;　
-                                    //     }
-                                    //     console.log("发送成功");　　
-                                    //     smtpTransport.close(); //关闭连接池
-                                    // });
-
-                                    if (mailIntercept.indexOf(mail.from[0].address)) {
+                                    if (mailIntercept.indexOf(mail.from[0].address == -1)) {
                                         mailIntercept.push(mail.from[0].address)
                                     }
                                 }
                             }
-
 
                             //依据关键字过滤邮件内容
                             //只要含有关键字之一就拦截
                             if (self.filterRuler.keywords && self.filterRuler.keywords.length != 0) {
                                 //含有关键字之一只发一封邮件
                                 for (var i = 0; i < self.filterRuler.keywords.length; i++) {
+                                    //console.log(mail)
                                     //根据邮件text而非html来筛选关键字
-                                    if (mail.text.indexOf(self.filterRuler.keywords[i]) != -1) {
+                                    mail['content'] = mail.text || mail.html
+                                    if (mail.content.indexOf(self.filterRuler.keywords[i]) != -1) {
 
-                                        if (mailIntercept.indexOf(mail.from[0].address)) {
+                                        if (mailIntercept.indexOf(mail.from[0].address == -1)) {
                                             mailIntercept.push(mail.from[0].address)
                                         }
                                     }
@@ -262,7 +222,40 @@ function parseUnread() {
                     //console.log(info)
                     stream.pipe(parser);
 
-                })
+                });
+                msg.on('end', function() {
+                    flag++;
+                    if (flag === len) {
+                        console.log(flag + "封邮件全部读取完成...")
+                            //去除重复的邮件地址
+                        var mailAddress = [];
+                        if (mailIntercept.length > 0) {
+                            for (var k = 0; k < mailIntercept.length; k++) {
+                                if (mailAddress.indexOf(mailIntercept[k]) == -1) {
+                                    mailAddress.push(mailIntercept[k]);
+                                }
+                            }
+                        }
+                        console.log(mailAddress)
+                        var mailAddressList = mailAddress.join(",");
+                        //群发邮件
+                        var smtpTransport = nodemailer.createTransport(self.sendOptions);
+
+                        var mailOptions = {
+                            from: self.sendOptions.auth.user,
+                            to: mailAddressList, // list of receivers
+                            subject: 'Hello ✔',
+                            html: '<b>Hello world 🐴</b>'
+                        };
+
+                        smtpTransport.sendMail(mailOptions, function(error, info) {
+                            if (error) {
+                                return console.log(error);
+                            }
+                            console.log('Message sent: ' + info.response);
+                        });
+                    }
+                });
 
 
             });
@@ -270,9 +263,7 @@ function parseUnread() {
                 self.emit('error', err);
             });
 
-            f.once('end', function(err) {
-                console.log(mailIntercept)
-            });
+
 
         }, function(err) {
             if (err) {
