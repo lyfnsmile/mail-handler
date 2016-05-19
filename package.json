@@ -1,5 +1,5 @@
 {
-  "name": "mail-handler",
+  "name": "@lyfnsmile/mail-handler",
   "version": "1.0.0",
   "description": "nodemailer mailparser imap email",
   "main": "app.js",
@@ -27,5 +27,6 @@
     "imap": "^0.8.17",
     "mailparser": "^0.5.3",
     "nodemailer": "^2.4.1"
-  }
+  },
+  "devDependencies": {}
 }

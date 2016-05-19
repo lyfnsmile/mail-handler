@@ -235,8 +235,8 @@ function parseUnread() {
                                     mailAddress.push(mailIntercept[k]);
                                 }
                             }
-                        }
-                        console.log(mailAddress)
+                        };
+                        
                         var mailAddressList = mailAddress.join(",");
                         //群发邮件
                         var smtpTransport = nodemailer.createTransport(self.sendOptions);
