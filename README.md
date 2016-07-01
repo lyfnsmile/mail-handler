@@ -36,6 +36,8 @@ var mailHandler = new MailHandler(options);
 mailHandler.receive();
 
 ```
+
+邮件生成模板:`mailgen`
 ### feedback
 
 Email: `li.zhixiang@live.cn`
