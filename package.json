@@ -4,7 +4,8 @@
   "description": "nodemailer mailparser imap email",
   "main": "app.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "pretest": "npm install",
+    "test": "make test-coveralls"
   },
   "repository": {
     "type": "git",
@@ -25,10 +26,17 @@
     "async": "^2.0.0-rc.5",
     "body-parser": "^1.15.1",
     "imap": "^0.8.17",
+    "lodash": "^4.17.2",
+    "mailgen": "^2.0.2",
     "mailparser": "^0.5.3",
     "nodemailer": "^2.4.1"
   },
   "devDependencies": {
-    "codecov": "^1.0.1"
+    "chai": "^3.5.0",
+    "coveralls": "^2.11.15",
+    "istanbul": "^0.4.5",
+    "mocha": "^3.1.2",
+    "mocha-lcov-reporter": "^1.2.0",
+    "superagent": "^2.3.0"
   }
 }

@@ -6,7 +6,20 @@ var fs = require("fs");
 var path = require('path');
 var async = require('async');
 var util = require('util');
+var Mailgen = require('mailgen');
 
+
+// Configure mailgen by setting a theme and your product info
+var mailGenerator = new Mailgen({
+    theme: 'default',
+    product: {
+        // Appears in header & footer of e-mails
+        name: 'Mailgen',
+        link: 'https://mailgen.js/',
+        //Optional product logo
+        logo: 'https://raw.githubusercontent.com/nodemailer/nodemailer/master/assets/nm_logo_200x136.png'
+    }
+});
 
 //在此基础上增加邮件过滤功能
 //过滤规则有两种
@@ -15,7 +28,6 @@ var util = require('util');
 
 function MailHandler(options) {
     //options 对象  配置参数  
-
     this.markSeen = !!options.markSeen;
     this.mailbox = options.mailbox || "INBOX";
     if (typeof options.searchFilter === 'string') {
@@ -26,7 +38,16 @@ function MailHandler(options) {
         throw new error('参数类型错误!')
     }
 
-    this.filterRuler = options.filterRuler || null;
+    //filterRuler:
+
+
+    this.filterRuler = options.filterRuler || false; // is undefined or null and null
+
+    if (this.filterRuler) {
+        if (!(this.filterRuler.address || this.filterRuler.keywords)) {
+            this.filterRuler = false;
+        }
+    }
 
     this.keepAttachments = options.keepAttachments;
 
@@ -89,7 +110,6 @@ function imapReady() {
         if (err) {
             throw err;
         }
-
         imapMail.call(self)
     })
 
@@ -97,6 +117,13 @@ function imapReady() {
 
 function imapMail() {
     parseUnread.call(this);
+}
+
+function parentDir(dir) {
+    // access parent dirname
+    var index = dir.lastIndexOf('/');
+    return dir.substr(0, index)
+
 }
 
 //解析未读邮件
@@ -112,7 +139,8 @@ function parseUnread() {
         if (err) {
             throw err
         }
-        //异步并发的收取邮件内容
+        var parDir = parentDir(__dirname)
+            //异步并发的收取邮件内容
         async.each(results, function(result, callback) {
             var f = self.imap.fetch(result, {
                 bodies: '',
@@ -123,20 +151,23 @@ function parseUnread() {
                 var parser = new MailParser();
 
                 parser.on("end", function(mail) {
-
+                    flag++;
+                    //console.log('zai jie xi flag mail')
+                    //console.log(mail);
                     //保存邮件正文
                     fs.exists("content", function(exists) {
+                        console.log(mail.from[0]);
                         if (exists) {
-                            fs.writeFile(__dirname + '/content/' + 'msg- ' + seqno + '.html', mail.html, function(err) {
+                            fs.writeFile(parDir + '/content/' + mail.from[0].address + mail.from[0].name + '.html', mail.html, function(err) {
                                 if (err) {
-                                    throw err;
+                                    throw err
                                 }
                             });
                         } else {
                             fs.mkdir("content", function() {
-                                fs.writeFile(__dirname + '/content/' + 'msg- ' + seqno + '.html', mail.html, function(err) {
+                                fs.writeFile(parDir + '/content/' + mail.from[0].address + mail.from[0].name + '.html', mail.html, function(err) {
                                     if (err) {
-                                        throw err;
+                                        throw err
                                     }
                                 });
                             })
@@ -151,12 +182,14 @@ function parseUnread() {
 
                             //过滤收件人
                             if (self.filterRuler.address && self.filterRuler.address.length != 0) {
+
                                 var index = self.filterRuler.address.indexOf(mail.from[0].address);
                                 if (index != -1) {
 
-                                    if (mailIntercept.indexOf(mail.from[0].address == -1)) {
-                                        mailIntercept.push(mail.from[0].address)
-                                    }
+                                    //if (mailIntercept.indexOf(mail.from[0].address === -1)) {
+                                    mailIntercept.push(mail.from[0].address)
+                                        //}
+
                                 }
                             }
 
@@ -170,9 +203,9 @@ function parseUnread() {
                                     mail['content'] = mail.text || mail.html
                                     if (mail.content.indexOf(self.filterRuler.keywords[i]) != -1) {
 
-                                        if (mailIntercept.indexOf(mail.from[0].address == -1)) {
-                                            mailIntercept.push(mail.from[0].address)
-                                        }
+                                        //if (mailIntercept.indexOf(mail.from[0].address == -1)) {
+                                        mailIntercept.push(mail.from[0].address)
+                                            //}
                                     }
                                 }
 
@@ -180,7 +213,7 @@ function parseUnread() {
 
                         }
                     } else {
-                        console.log("获取不到发件人地址，无法给该封邮件自动回复!")
+                        console.info('no find address!!!');
                     }
 
                     //如果存在附件就保存到本地
@@ -193,18 +226,18 @@ function parseUnread() {
                             if (exists) {
                                 //mail.attachments为一个数组对象，一封邮件存在多个附件
                                 mail.attachments.forEach(function(attachment) {
-                                    fs.writeFile(__dirname + '/attachments/' + 'msg-' + seqno + '-' + attachment.generatedFileName, attachment.content, function(err) {
+                                    fs.writeFile(parDir + '/attachments/' + seqno + '-' + attachment.generatedFileName, attachment.content, function(err) {
                                         if (err) {
-                                            throw err;
+                                            console.log(err);
                                         }
                                     });
                                 });
                             } else {
                                 fs.mkdir("attachments", function() {
                                     mail.attachments.forEach(function(attachment) {
-                                        fs.writeFile(__dirname + '/attachments/' + 'msg-' + seqno + '-' + attachment.generatedFileName, attachment.content, function(err) {
+                                        fs.writeFile(parDir + '/attachments/' + seqno + '-' + attachment.generatedFileName, attachment.content, function(err) {
                                             if (err) {
-                                                throw err;
+                                                console.log(err);
                                             }
                                         });
                                     });
@@ -212,8 +245,63 @@ function parseUnread() {
                             }
                         })
 
-
                     };
+
+
+                    if (flag === len) {
+                        console.log(flag + "封邮件全部读取完成...")
+                            //去除重复的邮件地址
+                        var mailAddress = [];
+                        if (mailIntercept.length > 0) {
+                            // send mail only mailIntercept.length > 0
+                            for (var k = 0; k < mailIntercept.length; k++) {
+                                if (mailAddress.indexOf(mailIntercept[k]) === -1) {
+                                    mailAddress.push(mailIntercept[k]);
+                                }
+                            }
+
+                            var email = {
+                                body: {
+                                    name: 'fnpyud',
+                                    intro: 'thanks for received your mail!!!',
+                                    action: {
+                                        instructions: '白日依山尽，\n黄河入海流。</br>欲穷千里目，\n更上一层楼。',
+                                        button: {
+                                            color: '#22BC66',
+                                            text: 'Confirm your account',
+                                            link: 'http://www.baidu.com'
+                                        }
+                                    },
+                                    outro: 'Need help, or have questions? Just reply to this email, we\'d love to help.'
+                                }
+                            };
+
+                            // Generate an HTML email with the provided contents
+                            var emailBody = mailGenerator.generate(email);
+
+                            var mailAddressList = mailAddress.join(",");
+                            //群发邮件
+                            var smtpTransport = nodemailer.createTransport(self.sendOptions);
+
+                            var mailOptions = {
+                                from: self.sendOptions.auth.user,
+                                to: mailAddressList, // list of receivers
+                                subject: 'autoReply',
+                                html: emailBody
+                            };
+
+                            // smtpTransport.sendMail(mailOptions, function(error, info) {
+                            //     if (error) {
+                            //         console.log(error);
+                            //     }
+                            //     console.log('Message sent: ' + info.response);
+                            // });
+
+                        };
+
+
+                    }
+
                 });
 
 
@@ -224,45 +312,43 @@ function parseUnread() {
 
                 });
                 msg.on('end', function() {
-                    flag++;
-                    if (flag === len) {
-                        console.log(flag + "封邮件全部读取完成...")
-                            //去除重复的邮件地址
-                        var mailAddress = [];
-                        if (mailIntercept.length > 0) {
-                            for (var k = 0; k < mailIntercept.length; k++) {
-                                if (mailAddress.indexOf(mailIntercept[k]) == -1) {
-                                    mailAddress.push(mailIntercept[k]);
-                                }
-                            }
-                        };
-                        
-                        var mailAddressList = mailAddress.join(",");
-                        //群发邮件
-                        var smtpTransport = nodemailer.createTransport(self.sendOptions);
+                    // flag++;
+                    // if (flag === len) {
+                    //     console.log(flag + "封邮件全部读取完成...")
+                    //         //去除重复的邮件地址
+                    //     var mailAddress = [];
+                    //     if (mailIntercept.length > 0) {
+                    //         for (var k = 0; k < mailIntercept.length; k++) {
+                    //             if (mailAddress.indexOf(mailIntercept[k]) == -1) {
+                    //                 mailAddress.push(mailIntercept[k]);
+                    //             }
+                    //         }
+                    //     };
 
-                        var mailOptions = {
-                            from: self.sendOptions.auth.user,
-                            to: mailAddressList, // list of receivers
-                            subject: 'Hello ✔',
-                            html: '<b>Hello world 🐴</b>'
-                        };
+                        // var mailAddressList = mailAddress.join(",");
+                        // //群发邮件
+                        // var smtpTransport = nodemailer.createTransport(self.sendOptions);
 
-                        smtpTransport.sendMail(mailOptions, function(error, info) {
-                            if (error) {
-                                return console.log(error);
-                            }
-                            console.log('Message sent: ' + info.response);
-                        });
-                    }
+                        // var mailOptions = {
+                        //     from: self.sendOptions.auth.user,
+                        //     to: mailAddressList, // list of receivers
+                        //     subject: 'Hello ✔',
+                        //     html: '<b>Hello world 🐴</b>'
+                        // };
+
+                        // smtpTransport.sendMail(mailOptions, function(error, info) {
+                        //     if (error) {
+                        //         console.log(error);
+                        //     }
+                        //     console.log('Message sent: ' + info.response);
+                        // });
+                   // }
                 });
-
 
             });
             f.once('error', function(err) {
-                self.emit('error', err);
+                console.log(err);
             });
-
 
 
         }, function(err) {
@@ -277,6 +363,7 @@ function parseUnread() {
 
 module.exports = MailHandler;
 
+//978169861
 
 
 //关于邮件过滤的思路
