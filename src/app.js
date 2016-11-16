@@ -26,7 +26,7 @@ var mailGenerator = new Mailgen({
 //一是过滤特定发件人的邮件
 //二是过滤特定邮件内容
 
-function MailHandler(options) {
+function MailHandler(options ) {
     //options 对象  配置参数  
     this.markSeen = !!options.markSeen;
     this.mailbox = options.mailbox || "INBOX";
