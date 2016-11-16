@@ -2,6 +2,7 @@ var EventEmitter = require('events').EventEmitter;
 var Imap = require('imap');
 var nodemailer = require('nodemailer');
 var MailParser = require("mailparser").MailParser;
+var _ = require('lodash');
 var fs = require("fs");
 var path = require('path');
 var async = require('async');
@@ -26,7 +27,29 @@ var mailGenerator = new Mailgen({
 //一是过滤特定发件人的邮件
 //二是过滤特定邮件内容
 
-function MailHandler(options ) {
+function MailHandler(options, user, pass) {
+
+    //he bing options and defaults
+
+    var defaults = {
+        "markSeen": true,
+        "keepAttachments": true,
+        "searchFilter": ['UNSEEN'],
+        "received": {
+            host: 'imap.qq.com',
+            port: 993,
+            tls: true
+        },
+        "send": {
+            host: 'smtp.qq.com',
+            port: 465,
+            secure: true, // use SSL
+        },
+
+    }
+
+    options = _.assign({}, defaults, options);
+
     //options 对象  配置参数  
     this.markSeen = !!options.markSeen;
     this.mailbox = options.mailbox || "INBOX";
@@ -62,8 +85,8 @@ function MailHandler(options ) {
 
     //配置收件箱参数
     this.imap = new Imap({
-        user: options.received.user,
-        password: options.received.pass,
+        user: user,
+        password: pass,
         host: options.received.host,
         port: options.received.port,
         tls: options.received.tls,
@@ -80,8 +103,8 @@ function MailHandler(options ) {
         port: options.send.port,
         secure: true, // use SSL
         auth: {
-            user: options.send.auth.user,
-            pass: options.send.auth.pass
+            user: user,
+            pass: pass
         }
     }
 };
@@ -139,7 +162,7 @@ function parseUnread() {
         if (err) {
             throw err
         }
-        var parDir = parentDir(__dirname)
+        //var parDir = parentDir(__dirname)
             //异步并发的收取邮件内容
         async.each(results, function(result, callback) {
             var f = self.imap.fetch(result, {
@@ -158,14 +181,14 @@ function parseUnread() {
                     fs.exists("content", function(exists) {
                         console.log(mail.from[0]);
                         if (exists) {
-                            fs.writeFile(parDir + '/content/' + mail.from[0].address + mail.from[0].name + '.html', mail.html, function(err) {
+                            fs.writeFile(__dirname + '/content/' + mail.from[0].address + mail.from[0].name + '.html', mail.html, function(err) {
                                 if (err) {
                                     throw err
                                 }
                             });
                         } else {
                             fs.mkdir("content", function() {
-                                fs.writeFile(parDir + '/content/' + mail.from[0].address + mail.from[0].name + '.html', mail.html, function(err) {
+                                fs.writeFile(__dirname + '/content/' + mail.from[0].address + mail.from[0].name + '.html', mail.html, function(err) {
                                     if (err) {
                                         throw err
                                     }
@@ -226,7 +249,7 @@ function parseUnread() {
                             if (exists) {
                                 //mail.attachments为一个数组对象，一封邮件存在多个附件
                                 mail.attachments.forEach(function(attachment) {
-                                    fs.writeFile(parDir + '/attachments/' + seqno + '-' + attachment.generatedFileName, attachment.content, function(err) {
+                                    fs.writeFile(__dirname + '/attachments/' + seqno + '-' + attachment.generatedFileName, attachment.content, function(err) {
                                         if (err) {
                                             console.log(err);
                                         }
@@ -235,7 +258,7 @@ function parseUnread() {
                             } else {
                                 fs.mkdir("attachments", function() {
                                     mail.attachments.forEach(function(attachment) {
-                                        fs.writeFile(parDir + '/attachments/' + seqno + '-' + attachment.generatedFileName, attachment.content, function(err) {
+                                        fs.writeFile(__dirname + '/attachments/' + seqno + '-' + attachment.generatedFileName, attachment.content, function(err) {
                                             if (err) {
                                                 console.log(err);
                                             }
@@ -325,24 +348,24 @@ function parseUnread() {
                     //         }
                     //     };
 
-                        // var mailAddressList = mailAddress.join(",");
-                        // //群发邮件
-                        // var smtpTransport = nodemailer.createTransport(self.sendOptions);
+                    // var mailAddressList = mailAddress.join(",");
+                    // //群发邮件
+                    // var smtpTransport = nodemailer.createTransport(self.sendOptions);
 
-                        // var mailOptions = {
-                        //     from: self.sendOptions.auth.user,
-                        //     to: mailAddressList, // list of receivers
-                        //     subject: 'Hello ✔',
-                        //     html: '<b>Hello world 🐴</b>'
-                        // };
+                    // var mailOptions = {
+                    //     from: self.sendOptions.auth.user,
+                    //     to: mailAddressList, // list of receivers
+                    //     subject: 'Hello ✔',
+                    //     html: '<b>Hello world 🐴</b>'
+                    // };
 
-                        // smtpTransport.sendMail(mailOptions, function(error, info) {
-                        //     if (error) {
-                        //         console.log(error);
-                        //     }
-                        //     console.log('Message sent: ' + info.response);
-                        // });
-                   // }
+                    // smtpTransport.sendMail(mailOptions, function(error, info) {
+                    //     if (error) {
+                    //         console.log(error);
+                    //     }
+                    //     console.log('Message sent: ' + info.response);
+                    // });
+                    // }
                 });
 
             });
@@ -361,7 +384,14 @@ function parseUnread() {
 }
 
 
-module.exports = MailHandler;
+var mailHandler = new MailHandler({
+    "filterRuler": {
+        "address": ['978169861@qq.com'],
+        // "keywords":[keyword1,keyword2]
+    }
+}, 'user','pass');
+
+mailHandler.receive()
 
 //978169861
 

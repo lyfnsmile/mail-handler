@@ -16,6 +16,9 @@
     "node",
     "node-mail"
   ],
+  "bin": {
+    "mymailer": "./bin/mymailer"
+  },
   "author": "lyfnsmile",
   "license": "MIT",
   "bugs": {
@@ -25,6 +28,8 @@
   "dependencies": {
     "async": "^2.0.0-rc.5",
     "body-parser": "^1.15.1",
+    "co": "^4.6.0",
+    "co-prompt": "^1.0.0",
     "imap": "^0.8.17",
     "lodash": "^4.17.2",
     "mailgen": "^2.0.2",
@@ -33,6 +38,7 @@
   },
   "devDependencies": {
     "chai": "^3.5.0",
+    "colors": "^1.1.2",
     "coveralls": "^2.11.15",
     "istanbul": "^0.4.5",
     "mocha": "^3.1.2",

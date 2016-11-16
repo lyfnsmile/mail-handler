@@ -1,0 +1,34 @@
+#!/usr/bin/env node
+
+var program = require('commander');
+var colors = require('colors');
+var co = require('co');
+var prompt = require('co-prompt');
+
+//命名版本号
+program.version('1.1.0');
+
+//help命令
+program
+    .command('help')
+    .description('显示使用帮助'.green)
+    .action(function() {
+        program.outputHelp();
+    });
+
+//初始化配置项
+program
+    .command('init')
+    .alias('i')
+    .option('-u, --user <username>', 'initial a new user')
+    .description('初始化相关配置参数')
+     .action(function() {
+	    co(function *() {
+	     var username = yield prompt('username: ');
+	     var password = yield prompt.password('password: ');
+	       console.log('user: %s pass: %s file: %s', username, password);
+	    });
+	})
+
+//开始解析命令
+program.parse(process.argv)
